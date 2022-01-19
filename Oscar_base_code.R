@@ -75,7 +75,7 @@ C_sof_glmmMCMC <- compileNimble(sof_glmmMCMC, project = sofModel)
 
 # Run MCMC and sample
 burnin = 10000
-n_samples = 50000
+n_samples = 1000
 n_chains=1
 samples <- runMCMC(C_sof_glmmMCMC, niter = burnin+n_samples,nchains=n_chains)
 
