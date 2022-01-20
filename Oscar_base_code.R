@@ -4,6 +4,8 @@ library(ggplot2)
 library(GGally) 
 library(nimble)
 
+rm(list = ls())
+
 ############### Load and preprocess data ######################
 AIdata = readRDS('AIdataset.Rds') 
 # Data where icustm plays a role
@@ -18,7 +20,7 @@ AIdata$di = AIdata$di+0.0001
 
 # Plot pair and relation between data
 ggpairs(AIdata %>% select(-c(id)),   
-        columns = 1:4,     
+        columns = 1:5,     
         aes(color = fail,  
             alpha = 0.5))    
 
@@ -52,7 +54,8 @@ sof_model <- nimbleCode({
 
 # Make small adjusted data smoothing with log
 X <- AIdata %>% select(-c(id,di,fail)) %>% filter(!is.na(sofa))
-X$day = log(X$day)
+X$day = log(X$day)  # This solves the beta1 convergence!
+X$age <- (X$age - mean(X$age)) / sd(X$age)
 sof_data <- list(
   x = data.matrix(X %>% select(-c(sofa))),
   y = X$sofa
@@ -75,7 +78,7 @@ C_sof_glmmMCMC <- compileNimble(sof_glmmMCMC, project = sofModel)
 
 # Run MCMC and sample
 burnin = 10000
-n_samples = 1000
+n_samples = 10000
 n_chains=1
 samples <- runMCMC(C_sof_glmmMCMC, niter = burnin+n_samples,nchains=n_chains)
 
@@ -83,6 +86,10 @@ outpt = samples[burnin:(n_samples+burnin),]
 par(mfrow = c(2, 2))
 coda::traceplot(coda::as.mcmc(outpt),col=1:4)
 
+# So Beta0 and Beta2 are not converging at all. What can we do about it?
+# Beta0 is the intercept
+# Beta1 is the coefficient for day
+# Beta2 is the coefficient for age
 # Extract and predict sofa
 betas = colMeans(outpt)[1:2]
 beta0 = colMeans(outpt)[3]
