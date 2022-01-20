@@ -42,8 +42,8 @@ ggpairs(AIdata %>% select(c(age,day,sofa)) %>% filter(!is.na(sofa)),
 # This can be improved by smoothing variables and other type of regression
 sof_model <- nimbleCode({
   for (i in 1:N) {
-    mu <- beta0+inprod(beta[1:nbetas],x[i,1:nbetas])
-    y[i] ~ dnorm(mu,sigma)
+    mu[i] <- beta0+inprod(beta[1:nbetas],x[i,1:nbetas])
+    y[i] ~ dnorm(mu[i],sigma)
   }
   beta0 ~ dnorm(0,0.001)
   for(i in 1:nbetas){
@@ -55,15 +55,19 @@ sof_model <- nimbleCode({
 # Make small adjusted data smoothing with log
 X <- AIdata %>% select(-c(id,di,fail)) %>% filter(!is.na(sofa))
 X$day = log(X$day)  # This solves the beta1 convergence!
-X$age <- (X$age - mean(X$age)) / sd(X$age)
+#X$dayXage = X$day * X$age
 sof_data <- list(
   x = data.matrix(X %>% select(-c(sofa))),
   y = X$sofa
 )
 
+# sof_data$x <- sweep(sof_data$x, 2, colMeans(sof_data$x))  # center for better MCMC performance
+
+ncols = 2
+
 ## constants, data, and initial values
-sof_const<- list(N = nrow(X),nbetas=2)
-sof_inits <- list(beta0=0,beta =rep(0,2), sigma = 1)
+sof_const<- list(N = nrow(X),nbetas=ncols)
+sof_inits <- list(beta0=0,beta =rep(0,ncols), sigma = 1)
 
 ## create the model object
 sofModel <- nimbleModel(code = sof_model, constants = sof_const, data = sof_data, 
@@ -78,13 +82,13 @@ C_sof_glmmMCMC <- compileNimble(sof_glmmMCMC, project = sofModel)
 
 # Run MCMC and sample
 burnin = 10000
-n_samples = 10000
+n_samples = 100000
 n_chains=1
 samples <- runMCMC(C_sof_glmmMCMC, niter = burnin+n_samples,nchains=n_chains)
 
 outpt = samples[burnin:(n_samples+burnin),]
-par(mfrow = c(2, 2))
-coda::traceplot(coda::as.mcmc(outpt),col=1:4)
+par(mfrow = c(2, 3))
+coda::traceplot(coda::as.mcmc(outpt),col=1:5)
 
 # So Beta0 and Beta2 are not converging at all. What can we do about it?
 # Beta0 is the intercept
